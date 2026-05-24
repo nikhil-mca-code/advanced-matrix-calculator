@@ -8,7 +8,7 @@ A modern, responsive, and student-friendly web application designed to solve mat
 
 ## Live Preview
 
-(Add GitHub Pages link here after deployment)
+https://github.com/nikhil-mca-code/web-dev-projects.git
 
 ---
 
@@ -109,7 +109,7 @@ Example:
 1. Clone repository
 
 ```bash
-git clone <repo-link>
+git clone https://github.com/nikhil-mca-code/web-dev-projects.git
 ```
 
 2. Open project folder
