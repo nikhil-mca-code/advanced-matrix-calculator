@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <meta name="description" content="Advanced Matrix Calculator - Perform complex matrix operations with step-by-step solutions. Perfect for students and engineers.">
+    <title>MatrixForge | Advanced Matrix Calculator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="style.css">
+    <!-- Math.js for reliable advanced linear algebra computations -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.10.0/math.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Premium Header with Theme & Step Toggle -->
+        <header class="app-header">
+            <div class="logo-area">
+                <i class="fas fa-matrix logo-icon"></i>
+                <div>
+                    <h1>MatrixForge<span class="accent">.</span></h1>
+                    <p class="tagline">linear algebra studio</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="step-toggle-group">
+                    <span class="toggle-label"><i class="fas fa-code-branch"></i> Step-by-Step</span>
+                    <label class="switch">
+                        <input type="checkbox" id="stepModeToggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+                <button id="themeToggleBtn" class="icon-btn" aria-label="Dark/Light mode">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </div>
+        </header>
+
+        <main class="main-dashboard">
+            <!-- Matrix Panels Section -->
+            <div class="matrices-panel">
+                <!-- Matrix A Card -->
+                <div class="matrix-card glass-card">
+                    <div class="matrix-card-header">
+                        <h2><i class="fas fa-square"></i> Matrix A</h2>
+                        <div class="dimension-controls">
+                            <div class="dim-control">
+                                <label>Rows</label>
+                                <input type="number" id="rowsA" min="1" max="6" value="3" step="1">
+                            </div>
+                            <div class="dim-control">
+                                <label>Cols</label>
+                                <input type="number" id="colsA" min="1" max="6" value="3" step="1">
+                            </div>
+                            <button id="buildMatrixA" class="btn-outline small"><i class="fas fa-sync-alt"></i> Build</button>
+                        </div>
+                    </div>
+                    <div id="matrixAContainer" class="matrix-grid-container"></div>
+                    <div class="matrix-actions">
+                        <button id="setIdentityA" class="btn-ghost small"><i class="fas fa-eye"></i> Identity</button>
+                        <button id="setZeroA" class="btn-ghost small"><i class="fas fa-ban"></i> Zero</button>
+                    </div>
+                </div>
+
+                <!-- Matrix B Card -->
+                <div class="matrix-card glass-card">
+                    <div class="matrix-card-header">
+                        <h2><i class="fas fa-border-all"></i> Matrix B</h2>
+                        <div class="dimension-controls">
+                            <div class="dim-control">
+                                <label>Rows</label>
+                                <input type="number" id="rowsB" min="1" max="6" value="3" step="1">
+                            </div>
+                            <div class="dim-control">
+                                <label>Cols</label>
+                                <input type="number" id="colsB" min="1" max="6" value="3" step="1">
+                            </div>
+                            <button id="buildMatrixB" class="btn-outline small"><i class="fas fa-sync-alt"></i> Build</button>
+                        </div>
+                    </div>
+                    <div id="matrixBContainer" class="matrix-grid-container"></div>
+                    <div class="matrix-actions">
+                        <button id="setIdentityB" class="btn-ghost small"><i class="fas fa-eye"></i> Identity</button>
+                        <button id="setZeroB" class="btn-ghost small"><i class="fas fa-ban"></i> Zero</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Operations & Results Section -->
+            <div class="operations-panel">
+                <div class="ops-categories">
+                    <div class="ops-group">
+                        <h3><i class="fas fa-calculator"></i> Basic</h3>
+                        <div class="btn-group">
+                            <button data-op="add" class="op-btn">A + B</button>
+                            <button data-op="sub" class="op-btn">A - B</button>
+                            <button data-op="mul" class="op-btn">A × B</button>
+                            <button data-op="scalar" class="op-btn">Scalar × A</button>
+                            <button data-op="transpose" class="op-btn">Aᵀ</button>
+                        </div>
+                    </div>
+                    <div class="ops-group">
+                        <h3><i class="fas fa-chart-line"></i> Intermediate</h3>
+                        <div class="btn-group">
+                            <button data-op="det" class="op-btn">det(A)</button>
+                            <button data-op="inv" class="op-btn">A⁻¹</button>
+                            <button data-op="trace" class="op-btn">trace(A)</button>
+                            <button data-op="rank" class="op-btn">rank(A)</button>
+                            <button data-op="minor" class="op-btn">Minor (i,j)</button>
+                            <button data-op="cofactor" class="op-btn">Cofactor</button>
+                            <button data-op="adjoint" class="op-btn">Adjoint(A)</button>
+                        </div>
+                    </div>
+                    <div class="ops-group">
+                        <h3><i class="fas fa-microchip"></i> Advanced</h3>
+                        <div class="btn-group">
+                            <button data-op="ref" class="op-btn">REF (A)</button>
+                            <button data-op="rref" class="op-btn">RREF (A)</button>
+                            <button data-op="gauss_solve" class="op-btn">Solve Ax = b</button>
+                            <button data-op="power" class="op-btn">Aⁿ</button>
+                            <button data-op="matrixDiv" class="op-btn">A / B</button>
+                            <button data-op="lu" class="op-btn">LU Decomp</button>
+                        </div>
+                    </div>
+                    <div class="ops-group">
+                        <h3><i class="fas fa-atom"></i> Linear Algebra</h3>
+                        <div class="btn-group">
+                            <button data-op="eigen" class="op-btn">Eigenvalues</button>
+                            <button data-op="eigenvectors" class="op-btn">Eigenvectors</button>
+                            <button data-op="diag" class="op-btn">Diagonalizable?</button>
+                            <button data-op="charpoly" class="op-btn">Char. Polynomial</button>
+                        </div>
+                    </div>
+                    <div class="ops-group">
+                        <h3><i class="fas fa-check-double"></i> Analysis & Checks</h3>
+                        <div class="btn-group">
+                            <button data-op="isSymmetric" class="op-btn">Symmetric?</button>
+                            <button data-op="isSkew" class="op-btn">Skew-Sym?</button>
+                            <button data-op="isOrthogonal" class="op-btn">Orthogonal?</button>
+                            <button data-op="isSingular" class="op-btn">Singular?</button>
+                            <button data-op="isPosDef" class="op-btn">Pos. Definite?</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result & Steps Panel -->
+                <div class="result-area glass-card">
+                    <div class="result-header">
+                        <h3><i class="fas fa-microchip"></i> Output</h3>
+                        <div id="loadingIndicator" class="loading-badge hidden"><i class="fas fa-spinner fa-pulse"></i> Computing...</div>
+                    </div>
+                    <div id="resultDisplay" class="result-box">
+                        <p class="placeholder-text">Ready. Select an operation.</p>
+                    </div>
+                    <div id="stepsDisplay" class="steps-box">
+                        <div class="steps-header"><i class="fas fa-list-ol"></i> Step-by-step</div>
+                        <div id="stepsContent" class="steps-content">Click toggle to enable step mode.</div>
+                    </div>
+                    <div id="errorBox" class="error-message hidden"></div>
+                </div>
+            </div>
+        </main>
+        <footer class="app-footer">
+            <span>MatrixForge © 2025 — Advanced Linear Algebra Toolkit</span>
+        </footer>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
