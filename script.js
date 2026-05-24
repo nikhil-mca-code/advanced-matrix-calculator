@@ -1,618 +1,872 @@
 /**
  * MATRIXFORGE - ADVANCED MATRIX CALCULATOR
- * Production-grade matrix calculator with step-by-step mode and full linear algebra suite.
- * Uses Math.js for core computations and implements custom REF/RREF/step generation.
- * FIXED: robust error handling, dimension checks, safe cloning, and complete operation coverage.
+ * Audited for robust validation, stable matrix algorithms, accessible rendering,
+ * and compatibility with Math.js 11.x.
  */
 
-// ------------------------- GLOBALS & STATE -------------------------
-let matrixA = math.matrix([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
-let matrixB = math.matrix([[9, 8, 7], [6, 5, 4], [3, 2, 1]]);
-let stepMode = false;          // Step-by-step toggle state
-let currentTheme = 'light';    // 'light' or 'dark'
+(() => {
+    'use strict';
 
-// DOM Elements
-const themeToggleBtn = document.getElementById('themeToggleBtn');
-const stepToggleCheckbox = document.getElementById('stepModeToggle');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const resultDisplay = document.getElementById('resultDisplay');
-const stepsContent = document.getElementById('stepsContent');
-const errorBox = document.getElementById('errorBox');
+    const EPS = 1e-10;
+    const MAX_DIMENSION = 6;
 
-// Matrix dimension inputs
-const rowsAInput = document.getElementById('rowsA');
-const colsAInput = document.getElementById('colsA');
-const rowsBInput = document.getElementById('rowsB');
-const colsBInput = document.getElementById('colsB');
+    let matrixA;
+    let matrixB;
+    let stepMode = false;
+    let currentTheme = 'light';
+    let errorTimer = null;
 
-// Helper: Show/hide error message
-function showError(msg) {
-    errorBox.textContent = msg;
-    errorBox.classList.remove('hidden');
-    setTimeout(() => {
-        errorBox.classList.add('hidden');
-    }, 5000);
-}
+    const dom = {};
 
-function clearError() {
-    errorBox.classList.add('hidden');
-}
-
-// Helper: Loading state
-function setLoading(isLoading) {
-    if (isLoading) {
-        loadingIndicator.classList.remove('hidden');
-    } else {
-        loadingIndicator.classList.add('hidden');
+    function isMathReady() {
+        return typeof window.math !== 'undefined';
     }
-}
 
-// Helper: Pretty print any value (matrix, number, string)
-function prettyPrint(data) {
-    if (typeof data === 'number') {
-        return Math.abs(data) < 1e-10 ? '0' : data.toFixed(6).replace(/\.?0+$/, '');
+    function cacheDom() {
+        dom.themeToggleBtn = document.getElementById('themeToggleBtn');
+        dom.stepToggleCheckbox = document.getElementById('stepModeToggle');
+        dom.loadingIndicator = document.getElementById('loadingIndicator');
+        dom.resultDisplay = document.getElementById('resultDisplay');
+        dom.stepsContent = document.getElementById('stepsContent');
+        dom.errorBox = document.getElementById('errorBox');
+        dom.rowsAInput = document.getElementById('rowsA');
+        dom.colsAInput = document.getElementById('colsA');
+        dom.rowsBInput = document.getElementById('rowsB');
+        dom.colsBInput = document.getElementById('colsB');
+        dom.matrixAContainer = document.getElementById('matrixAContainer');
+        dom.matrixBContainer = document.getElementById('matrixBContainer');
     }
-    if (math.isMatrix(data)) {
-        const arr = data.toArray();
-        if (arr.length === 0) return '[]';
-        const formatted = arr.map(row =>
-            Array.isArray(row)
-                ? row.map(v => Number(v).toFixed(6).replace(/\.?0+$/, ''))
-                : Number(row).toFixed(6).replace(/\.?0+$/, '')
-        );
-        return math.format(formatted, { precision: 6 });
+
+    function isNearZero(value, tolerance = EPS) {
+        return Math.abs(value) <= tolerance;
     }
-    return math.format(data, { precision: 6 });
-}
 
-// ------------------------- DYNAMIC MATRIX INPUT RENDERING -------------------------
-function renderMatrixInput(rows, cols, containerId, matrixValues = null) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = '';
-    const grid = document.createElement('div');
-    grid.className = 'matrix-input-grid';
-    grid.style.display = 'grid';
-    grid.style.gridTemplateColumns = `repeat(${cols}, auto)`;
+    function cleanNumber(value) {
+        return isNearZero(value) ? 0 : value;
+    }
 
-    for (let i = 0; i < rows; i++) {
-        for (let j = 0; j < cols; j++) {
-            const input = document.createElement('input');
-            input.type = 'number';
-            input.step = 'any';
-            input.value = (matrixValues && matrixValues[i] && matrixValues[i][j] !== undefined) ? matrixValues[i][j] : 0;
-            input.dataset.row = i;
-            input.dataset.col = j;
-            input.addEventListener('input', () => updateMatrixFromInputs());
-            grid.appendChild(input);
+    function cleanMatrixArray(values) {
+        return values.map(row => row.map(cleanNumber));
+    }
+
+    function isSquareMatrix(matrix) {
+        const size = matrix.size();
+        return size.length === 2 && size[0] === size[1];
+    }
+
+    function validateDimension(value, name) {
+        const parsed = Number(value);
+        if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_DIMENSION) {
+            throw new Error(`${name} must be an integer from 1 to ${MAX_DIMENSION}.`);
         }
-    }
-    container.appendChild(grid);
-}
-
-function updateMatrixFromInputs() {
-    // Update matrixA
-    const rowsA = parseInt(rowsAInput.value, 10);
-    const colsA = parseInt(colsAInput.value, 10);
-    const containerA = document.getElementById('matrixAContainer');
-    if (containerA && !isNaN(rowsA) && !isNaN(colsA)) {
-        const inputs = containerA.querySelectorAll('input');
-        if (inputs.length === rowsA * colsA) {
-            const values = [];
-            for (let i = 0; i < rowsA; i++) {
-                const row = [];
-                for (let j = 0; j < colsA; j++) {
-                    const val = parseFloat(inputs[i * colsA + j].value);
-                    row.push(isNaN(val) ? 0 : val);
-                }
-                values.push(row);
-            }
-            matrixA = math.matrix(values);
-        }
+        return parsed;
     }
 
-    // Update matrixB
-    const rowsB = parseInt(rowsBInput.value, 10);
-    const colsB = parseInt(colsBInput.value, 10);
-    const containerB = document.getElementById('matrixBContainer');
-    if (containerB && !isNaN(rowsB) && !isNaN(colsB)) {
-        const inputs = containerB.querySelectorAll('input');
-        if (inputs.length === rowsB * colsB) {
-            const values = [];
-            for (let i = 0; i < rowsB; i++) {
-                const row = [];
-                for (let j = 0; j < colsB; j++) {
-                    const val = parseFloat(inputs[i * colsB + j].value);
-                    row.push(isNaN(val) ? 0 : val);
-                }
-                values.push(row);
-            }
-            matrixB = math.matrix(values);
+    function parseNumericCell(value) {
+        if (value.trim() === '') return 0;
+        const parsed = Number(value);
+        if (!Number.isFinite(parsed)) {
+            throw new Error('Matrix entries must be finite numbers.');
         }
+        return parsed;
     }
-}
 
-function rebuildMatrixDisplays() {
-    const sizeA = matrixA.size();
-    const rowsA = sizeA[0], colsA = sizeA[1];
-    rowsAInput.value = rowsA;
-    colsAInput.value = colsA;
-    renderMatrixInput(rowsA, colsA, 'matrixAContainer', matrixA.toArray());
-
-    const sizeB = matrixB.size();
-    const rowsB = sizeB[0], colsB = sizeB[1];
-    rowsBInput.value = rowsB;
-    colsBInput.value = colsB;
-    renderMatrixInput(rowsB, colsB, 'matrixBContainer', matrixB.toArray());
-}
-
-// Build events
-document.getElementById('buildMatrixA').addEventListener('click', () => {
-    const rows = parseInt(rowsAInput.value, 10);
-    const cols = parseInt(colsAInput.value, 10);
-    if (rows > 0 && cols > 0 && rows <= 6 && cols <= 6) {
-        renderMatrixInput(rows, cols, 'matrixAContainer');
-        updateMatrixFromInputs();
-    } else {
-        showError('Invalid dimensions for Matrix A (1-6)');
+    function matrixToArray(matrix) {
+        const arr = matrix.toArray();
+        return Array.isArray(arr[0]) ? arr.map(row => row.slice()) : [arr.slice()];
     }
-});
 
-document.getElementById('buildMatrixB').addEventListener('click', () => {
-    const rows = parseInt(rowsBInput.value, 10);
-    const cols = parseInt(colsBInput.value, 10);
-    if (rows > 0 && cols > 0 && rows <= 6 && cols <= 6) {
-        renderMatrixInput(rows, cols, 'matrixBContainer');
-        updateMatrixFromInputs();
-    } else {
-        showError('Invalid dimensions for Matrix B (1-6)');
+    function toVectorArray(data) {
+        if (math.isMatrix(data)) return data.toArray();
+        if (Array.isArray(data)) return data;
+        return [data];
     }
-});
 
-// Identity & Zero presets
-document.getElementById('setIdentityA').addEventListener('click', () => {
-    const rows = parseInt(rowsAInput.value, 10);
-    const cols = parseInt(colsAInput.value, 10);
-    if (rows === cols && rows > 0) {
-        matrixA = math.identity(rows);
-        rebuildMatrixDisplays();
-    } else {
-        showError('Identity matrix requires square dimensions');
+    function formatNumber(value) {
+        if (typeof value === 'number') {
+            const cleaned = cleanNumber(value);
+            return cleaned.toFixed(8).replace(/\.?0+$/, '');
+        }
+        if (math.typeOf(value) === 'Complex') {
+            return math.format(value, { precision: 8 });
+        }
+        return String(value);
     }
-});
 
-document.getElementById('setZeroA').addEventListener('click', () => {
-    const rows = parseInt(rowsAInput.value, 10);
-    const cols = parseInt(colsAInput.value, 10);
-    if (rows > 0 && cols > 0) {
-        matrixA = math.zeros(rows, cols);
-        rebuildMatrixDisplays();
-    } else {
-        showError('Invalid dimensions for zero matrix');
+    function prettyPrint(data) {
+        if (data === null || data === undefined) return '';
+        if (typeof data === 'number') return formatNumber(data);
+        if (typeof data === 'string') return data;
+        if (math.isMatrix(data)) {
+            const arr = data.toArray();
+            const formatted = Array.isArray(arr[0])
+                ? arr.map(row => row.map(formatNumber))
+                : arr.map(formatNumber);
+            return math.format(formatted, { precision: 8 });
+        }
+        if (Array.isArray(data)) {
+            return math.format(data.map(item => typeof item === 'number' ? cleanNumber(item) : item), { precision: 8 });
+        }
+        return math.format(data, { precision: 8 });
     }
-});
 
-document.getElementById('setIdentityB').addEventListener('click', () => {
-    const rows = parseInt(rowsBInput.value, 10);
-    const cols = parseInt(colsBInput.value, 10);
-    if (rows === cols && rows > 0) {
-        matrixB = math.identity(rows);
-        rebuildMatrixDisplays();
-    } else {
-        showError('Identity matrix requires square dimensions');
+    function setText(element, text) {
+        element.textContent = text;
     }
-});
 
-document.getElementById('setZeroB').addEventListener('click', () => {
-    const rows = parseInt(rowsBInput.value, 10);
-    const cols = parseInt(colsBInput.value, 10);
-    if (rows > 0 && cols > 0) {
-        matrixB = math.zeros(rows, cols);
-        rebuildMatrixDisplays();
-    } else {
-        showError('Invalid dimensions for zero matrix');
+    function setPre(element, text, className = '') {
+        element.textContent = '';
+        const pre = document.createElement('pre');
+        pre.textContent = text;
+        if (className) pre.className = className;
+        element.appendChild(pre);
     }
-});
 
-// ------------------------- CUSTOM REF / RREF WITH STEP GENERATION (safe clones) -------------------------
-function deepCloneMatrix(matrix) {
-    return JSON.parse(JSON.stringify(matrix.toArray()));
-}
-
-function computeREF(matrix, returnSteps = false) {
-    const A = deepCloneMatrix(matrix);
-    const rows = A.length;
-    const cols = A[0].length;
-    const steps = [];
-    let lead = 0;
-    for (let r = 0; r < rows; r++) {
-        if (lead >= cols) break;
-        let i = r;
-        while (Math.abs(A[i][lead]) < 1e-12) {
-            i++;
-            if (i === rows) {
-                i = r;
-                lead++;
-                if (lead === cols) break;
-            }
-        }
-        if (lead === cols) break;
-        if (i !== r) {
-            [A[i], A[r]] = [A[r], A[i]];
-            steps.push(`Swap row ${i+1} with row ${r+1}`);
-        }
-        const pivot = A[r][lead];
-        if (Math.abs(pivot - 1) > 1e-12 && Math.abs(pivot) > 1e-12) {
-            for (let k = 0; k < cols; k++) {
-                A[r][k] = A[r][k] / pivot;
-            }
-            steps.push(`Multiply row ${r+1} by 1/${pivot.toFixed(4)} to make leading coefficient 1`);
-        }
-        for (let j = 0; j < rows; j++) {
-            if (j !== r && Math.abs(A[j][lead]) > 1e-12) {
-                const factor = A[j][lead];
-                for (let k = 0; k < cols; k++) {
-                    A[j][k] -= factor * A[r][k];
-                }
-                steps.push(`Eliminate column ${lead+1} in row ${j+1} using row ${r+1}`);
-            }
-        }
-        lead++;
+    function normalizeTableData(value) {
+        if (math.isMatrix(value)) return normalizeTableData(value.toArray());
+        if (!Array.isArray(value)) return null;
+        if (value.length === 0) return [[]];
+        return Array.isArray(value[0]) ? value : value.map(item => [item]);
     }
-    const resultMatrix = math.matrix(A);
-    if (returnSteps) return { result: resultMatrix, steps };
-    return resultMatrix;
-}
 
-function computeRREF(matrix, returnSteps = false) {
-    const A = deepCloneMatrix(matrix);
-    const rows = A.length;
-    const cols = A[0].length;
-    const steps = [];
-    let lead = 0;
-    for (let r = 0; r < rows; r++) {
-        if (lead >= cols) break;
-        let i = r;
-        while (Math.abs(A[i][lead]) < 1e-12) {
-            i++;
-            if (i === rows) {
-                i = r;
-                lead++;
-                if (lead === cols) break;
-            }
-        }
-        if (lead === cols) break;
-        if (i !== r) {
-            [A[i], A[r]] = [A[r], A[i]];
-            steps.push(`Swap row ${i+1} with row ${r+1}`);
-        }
-        const pivot = A[r][lead];
-        if (Math.abs(pivot - 1) > 1e-12 && Math.abs(pivot) > 1e-12) {
-            for (let k = 0; k < cols; k++) {
-                A[r][k] = A[r][k] / pivot;
-            }
-            steps.push(`Scale row ${r+1} by 1/${pivot.toFixed(4)}`);
-        }
-        for (let j = 0; j < rows; j++) {
-            if (j !== r && Math.abs(A[j][lead]) > 1e-12) {
-                const factor = A[j][lead];
-                for (let k = 0; k < cols; k++) {
-                    A[j][k] -= factor * A[r][k];
-                }
-                steps.push(`Row ${j+1} <- Row ${j+1} - ${factor.toFixed(4)} * Row ${r+1}`);
-            }
-        }
-        lead++;
+    function createMatrixTable(value, label = 'Matrix result') {
+        const rows = normalizeTableData(value);
+        if (!rows) return null;
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'matrix-result-wrapper';
+
+        const table = document.createElement('table');
+        table.className = 'matrix-result-table';
+        table.setAttribute('aria-label', label);
+
+        const tbody = document.createElement('tbody');
+        rows.forEach(row => {
+            const tr = document.createElement('tr');
+            row.forEach(cell => {
+                const td = document.createElement('td');
+                td.textContent = formatNumber(cell);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        return wrapper;
     }
-    if (returnSteps) return { result: math.matrix(A), steps };
-    return math.matrix(A);
-}
 
-// Gaussian elimination to solve Ax = b (unique solution)
-function solveLinearGauss(A, b, returnSteps = false) {
-    const augmented = A.toArray().map((row, idx) => [...row, b.get([idx])]);
-    const steps = [];
-    const rows = augmented.length;
-    const cols = augmented[0].length;
-    for (let i = 0; i < rows; i++) {
-        let maxRow = i;
-        for (let k = i+1; k < rows; k++) {
-            if (Math.abs(augmented[k][i]) > Math.abs(augmented[maxRow][i])) maxRow = k;
+    function appendResultBlock(parent, title, value) {
+        const section = document.createElement('section');
+        section.className = 'result-block';
+
+        if (title) {
+            const heading = document.createElement('h4');
+            heading.textContent = title;
+            section.appendChild(heading);
         }
-        if (Math.abs(augmented[maxRow][i]) < 1e-12) throw new Error('Singular matrix, no unique solution');
-        if (maxRow !== i) {
-            [augmented[i], augmented[maxRow]] = [augmented[maxRow], augmented[i]];
-            steps.push(`Swap row ${i+1} with row ${maxRow+1}`);
-        }
-        for (let k = i+1; k < rows; k++) {
-            const factor = augmented[k][i] / augmented[i][i];
-            for (let j = i; j < cols; j++) {
-                augmented[k][j] -= factor * augmented[i][j];
-            }
-            steps.push(`Eliminate x${i+1} from row ${k+1} (factor ${factor.toFixed(4)})`);
-        }
+
+        const table = createMatrixTable(value, title || 'Matrix result');
+        if (table) section.appendChild(table);
+        else setPre(section, prettyPrint(value));
+
+        parent.appendChild(section);
     }
-    const x = new Array(rows).fill(0);
-    for (let i = rows-1; i >= 0; i--) {
-        let sum = 0;
-        for (let j = i+1; j < rows; j++) sum += augmented[i][j] * x[j];
-        x[i] = (augmented[i][cols-1] - sum) / augmented[i][i];
+
+    function showError(message) {
+        clearTimeout(errorTimer);
+        dom.errorBox.textContent = message;
+        dom.errorBox.classList.remove('hidden');
+        errorTimer = setTimeout(() => dom.errorBox.classList.add('hidden'), 6000);
     }
-    const solution = math.matrix(x);
-    if (returnSteps) return { result: solution, steps };
-    return solution;
-}
 
-// ------------------------- OPERATION HANDLER WITH STEP MODE -------------------------
-async function executeOperation(op, extraParams = {}) {
-    setLoading(true);
-    clearError();
-    resultDisplay.innerHTML = '<p class="placeholder-text">Computing...</p>';
-    stepsContent.innerHTML = 'Preparing result...';
-    try {
-        updateMatrixFromInputs(); // sync latest user values
+    function clearError() {
+        clearTimeout(errorTimer);
+        dom.errorBox.textContent = '';
+        dom.errorBox.classList.add('hidden');
+    }
 
-        let resultValue = null;
-        let stepsArray = [];
-        const withSteps = stepMode;
+    function setLoading(isLoading) {
+        dom.loadingIndicator.classList.toggle('hidden', !isLoading);
+    }
 
-        // Helper dimension checks
-        function ensureSquare(mat, name) {
-            if (!math.isSquare(mat)) throw new Error(`${name} must be square matrix`);
-        }
-        function ensureSameDimensions(A, B) {
-            const sA = A.size(), sB = B.size();
-            if (sA[0] !== sB[0] || sA[1] !== sB[1]) {
-                throw new Error(`Dimension mismatch: (${sA[0]}x${sA[1]}) vs (${sB[0]}x${sB[1]})`);
+    function readDimensions(prefix) {
+        const rowsInput = prefix === 'A' ? dom.rowsAInput : dom.rowsBInput;
+        const colsInput = prefix === 'A' ? dom.colsAInput : dom.colsBInput;
+        return {
+            rows: validateDimension(rowsInput.value, `Matrix ${prefix} rows`),
+            cols: validateDimension(colsInput.value, `Matrix ${prefix} columns`)
+        };
+    }
+
+    function renderMatrixInput(rows, cols, container, matrixName, values = null) {
+        container.textContent = '';
+        const grid = document.createElement('div');
+        grid.className = 'matrix-input-grid';
+        grid.style.gridTemplateColumns = `repeat(${cols}, minmax(54px, 70px))`;
+
+        for (let row = 0; row < rows; row++) {
+            for (let col = 0; col < cols; col++) {
+                const input = document.createElement('input');
+                input.type = 'number';
+                input.step = 'any';
+                input.inputMode = 'decimal';
+                input.value = values && values[row] && values[row][col] !== undefined ? values[row][col] : 0;
+                input.dataset.row = String(row);
+                input.dataset.col = String(col);
+                input.setAttribute('aria-label', `Matrix ${matrixName} row ${row + 1} column ${col + 1}`);
+                input.addEventListener('input', updateMatrixFromInputs);
+                grid.appendChild(input);
             }
         }
 
-        switch(op) {
-            case 'add':
-                ensureSameDimensions(matrixA, matrixB);
-                resultValue = math.add(matrixA, matrixB);
-                if (withSteps) stepsArray.push(`A + B: element-wise addition. Dimensions match (${matrixA.size()[0]}x${matrixA.size()[1]}).`);
-                break;
-            case 'sub':
-                ensureSameDimensions(matrixA, matrixB);
-                resultValue = math.subtract(matrixA, matrixB);
-                if (withSteps) stepsArray.push(`A - B: subtract corresponding elements.`);
-                break;
-            case 'mul':
-                if (matrixA.size()[1] !== matrixB.size()[0]) {
-                    throw new Error(`Multiplication impossible: columns of A (${matrixA.size()[1]}) != rows of B (${matrixB.size()[0]})`);
-                }
-                resultValue = math.multiply(matrixA, matrixB);
-                if (withSteps) stepsArray.push(`Matrix multiplication: (${matrixA.size()[0]}x${matrixA.size()[1]}) × (${matrixB.size()[0]}x${matrixB.size()[1]}) = ${matrixA.size()[0]}x${matrixB.size()[1]}`);
-                break;
-            case 'scalar':
-                const scalar = parseFloat(prompt('Enter scalar value:', '2'));
-                if (isNaN(scalar)) throw new Error('Invalid scalar');
-                resultValue = math.multiply(matrixA, scalar);
-                if (withSteps) stepsArray.push(`Scalar multiplication: each element of A multiplied by ${scalar}`);
-                break;
-            case 'transpose':
-                resultValue = math.transpose(matrixA);
-                if (withSteps) stepsArray.push(`Transpose: swap rows and columns.`);
-                break;
-            case 'det':
-                ensureSquare(matrixA, 'Matrix A');
-                const detVal = math.det(matrixA);
-                resultValue = detVal;
-                if (withSteps) stepsArray.push(`Determinant computed using Laplace expansion. det(A) = ${prettyPrint(detVal)}`);
-                break;
-            case 'inv':
-                ensureSquare(matrixA, 'Matrix A');
-                if (Math.abs(math.det(matrixA)) < 1e-12) throw new Error('Matrix is singular, cannot invert');
-                resultValue = math.inv(matrixA);
-                if (withSteps) stepsArray.push(`Inverse computed via adjugate/determinant method.`);
-                break;
-            case 'trace':
-                ensureSquare(matrixA, 'Matrix A');
-                resultValue = math.trace(matrixA);
-                if (withSteps) stepsArray.push(`Trace = sum of diagonal elements = ${prettyPrint(resultValue)}`);
-                break;
-            case 'rank':
-                resultValue = math.rank(matrixA);
-                if (withSteps) stepsArray.push(`Rank = number of linearly independent rows/cols = ${resultValue}`);
-                break;
-            case 'minor':
-                ensureSquare(matrixA, 'Matrix A');
-                const iMin = parseInt(prompt('Row index (1-based):', '1'), 10) - 1;
-                const jMin = parseInt(prompt('Column index (1-based):', '1'), 10) - 1;
-                const sizeMin = matrixA.size()[0];
-                if (iMin < 0 || iMin >= sizeMin || jMin < 0 || jMin >= sizeMin) throw new Error('Index out of range');
-                const subMatrix = matrixA.toArray().filter((_, idx) => idx !== iMin).map(row => row.filter((_, idx) => idx !== jMin));
-                resultValue = math.det(math.matrix(subMatrix));
-                if (withSteps) stepsArray.push(`Minor M_{${iMin+1}${jMin+1}} = determinant after removing row ${iMin+1}, col ${jMin+1} = ${prettyPrint(resultValue)}`);
-                break;
-            case 'cofactor':
-                ensureSquare(matrixA, 'Matrix A');
-                const iCof = parseInt(prompt('Row index (1-based):', '1'), 10) - 1;
-                const jCof = parseInt(prompt('Column index (1-based):', '1'), 10) - 1;
-                const sizeCof = matrixA.size()[0];
-                if (iCof < 0 || iCof >= sizeCof || jCof < 0 || jCof >= sizeCof) throw new Error('Index out of range');
-                const subCof = matrixA.toArray().filter((_, idx) => idx !== iCof).map(row => row.filter((_, idx) => idx !== jCof));
-                const minorVal = math.det(math.matrix(subCof));
-                resultValue = Math.pow(-1, iCof + jCof) * minorVal;
-                if (withSteps) stepsArray.push(`Cofactor C_{${iCof+1}${jCof+1}} = (-1)^(${iCof+jCof}) * minor = ${prettyPrint(resultValue)}`);
-                break;
-            case 'adjoint':
-                ensureSquare(matrixA, 'Matrix A');
-                resultValue = math.adjoint(matrixA);
-                if (withSteps) stepsArray.push(`Adjoint = transpose of cofactor matrix.`);
-                break;
-            case 'ref':
-                const refRes = computeREF(matrixA, withSteps);
-                resultValue = refRes.result;
-                if (withSteps) stepsArray = refRes.steps;
-                break;
-            case 'rref':
-                const rrefRes = computeRREF(matrixA, withSteps);
-                resultValue = rrefRes.result;
-                if (withSteps) stepsArray = rrefRes.steps;
-                break;
-            case 'gauss_solve':
-                ensureSquare(matrixA, 'Matrix A');
-                const n = matrixA.size()[0];
-                const bInput = prompt(`Enter b vector (${n} numbers space-separated):`, '1 2 3');
-                if (!bInput) throw new Error('No input provided');
-                const bVals = bInput.trim().split(/\s+/).map(Number);
-                if (bVals.length !== n || bVals.some(isNaN)) throw new Error('Invalid b vector');
-                const bMat = math.matrix(bVals);
-                const solveRes = solveLinearGauss(matrixA, bMat, withSteps);
-                resultValue = solveRes.result;
-                if (withSteps) stepsArray = solveRes.steps;
-                break;
-            case 'power':
-                ensureSquare(matrixA, 'Matrix A');
-                const exp = parseInt(prompt('Exponent n (integer):', '2'), 10);
-                if (isNaN(exp)) throw new Error('Invalid exponent');
-                resultValue = math.matrixPower(matrixA, exp);
-                if (withSteps) stepsArray.push(`A^${exp} computed by repeated multiplication.`);
-                break;
-            case 'matrixDiv':
-                ensureSquare(matrixB, 'Matrix B');
-                if (Math.abs(math.det(matrixB)) < 1e-12) throw new Error('Matrix B is singular, cannot divide');
-                resultValue = math.multiply(matrixA, math.inv(matrixB));
-                if (withSteps) stepsArray.push(`A / B = A * B⁻¹`);
-                break;
-            case 'lu':
-                ensureSquare(matrixA, 'Matrix A');
-                const lu = math.lup(matrixA);
-                resultValue = { L: lu.L, U: lu.U, P: lu.P };
-                if (withSteps) stepsArray.push(`LU decomposition with partial pivoting: PA = LU.`);
-                break;
-            case 'eigen':
-                ensureSquare(matrixA, 'Matrix A');
-                const eigenvals = math.eigs(matrixA).values;
-                resultValue = eigenvals;
-                if (withSteps) stepsArray.push(`Eigenvalues: ${eigenvals.map(v => prettyPrint(v)).join(', ')}`);
-                break;
-            case 'eigenvectors':
-                ensureSquare(matrixA, 'Matrix A');
-                const eigVec = math.eigs(matrixA);
-                resultValue = eigVec.vectors;
-                if (withSteps) stepsArray.push(`Eigenvectors (columns) corresponding to eigenvalues.`);
-                break;
-            case 'diag':
-                ensureSquare(matrixA, 'Matrix A');
-                const eigDiag = math.eigs(matrixA);
-                const isDiag = eigDiag.vectors.size()[0] === matrixA.size()[0];
-                resultValue = isDiag ? 'Yes, diagonalizable' : 'No, not diagonalizable (defective)';
-                if (withSteps) stepsArray.push(`Diagonalizability check: algebraic multiplicity equals geometric multiplicity.`);
-                break;
-            case 'charpoly':
-                ensureSquare(matrixA, 'Matrix A');
-                const evals = math.eigs(matrixA).values.toArray();
-                const poly = evals.map((λ, i) => `(λ - ${prettyPrint(λ)})`).join(' · ');
-                resultValue = `Characteristic polynomial: ${poly}`;
-                if (withSteps) stepsArray.push(`Characteristic polynomial derived from eigenvalues.`);
-                break;
-            case 'isSymmetric':
-                resultValue = math.deepEqual(matrixA, math.transpose(matrixA)) ? '✅ Symmetric' : '❌ Not symmetric';
-                break;
-            case 'isSkew':
-                const negTrans = math.multiply(math.transpose(matrixA), -1);
-                resultValue = math.deepEqual(matrixA, negTrans) ? '✅ Skew-Symmetric' : '❌ Not skew-symmetric';
-                break;
-            case 'isOrthogonal':
-                const identity = math.identity(matrixA.size()[0]);
-                const check = math.deepEqual(math.multiply(matrixA, math.transpose(matrixA)), identity);
-                resultValue = check ? '✅ Orthogonal' : '❌ Not orthogonal';
-                break;
-            case 'isSingular':
-                const detCheck = math.isSquare(matrixA) ? math.det(matrixA) : NaN;
-                resultValue = (Math.abs(detCheck) < 1e-10) ? '⚠️ Singular' : '✅ Non-singular';
-                break;
-            case 'isPosDef':
-                const isSym = math.deepEqual(matrixA, math.transpose(matrixA));
-                let posDef = false;
-                if (isSym && math.isSquare(matrixA)) {
-                    try {
-                        const e = math.eigs(matrixA).values.toArray();
-                        posDef = e.every(v => v > 1e-10);
-                    } catch (e) { posDef = false; }
-                }
-                resultValue = posDef ? '✅ Positive Definite' : '❌ Not Positive Definite';
-                break;
-            default:
-                throw new Error('Unknown operation');
+        container.appendChild(grid);
+    }
+
+    function readMatrix(container, rows, cols) {
+        const inputs = Array.from(container.querySelectorAll('input'));
+        if (inputs.length !== rows * cols) {
+            throw new Error('Matrix grid is out of sync with its dimensions. Rebuild the matrix.');
         }
 
-        // Display result
-        let displayResult = '';
-        if (resultValue && typeof resultValue === 'object' && resultValue.isMatrix) {
-            displayResult = prettyPrint(resultValue);
-        } else if (resultValue && resultValue.L && resultValue.U) {
-            displayResult = `L (lower triangular):\n${prettyPrint(resultValue.L)}\n\nU (upper triangular):\n${prettyPrint(resultValue.U)}\n\nP (permutation):\n${prettyPrint(resultValue.P)}`;
-        } else if (typeof resultValue === 'object' && resultValue._data) {
-            displayResult = prettyPrint(resultValue);
+        const values = [];
+        for (let row = 0; row < rows; row++) {
+            const currentRow = [];
+            for (let col = 0; col < cols; col++) {
+                currentRow.push(parseNumericCell(inputs[row * cols + col].value));
+            }
+            values.push(currentRow);
+        }
+        return math.matrix(values);
+    }
+
+    function updateMatrixFromInputs() {
+        try {
+            const dimA = readDimensions('A');
+            const dimB = readDimensions('B');
+            matrixA = readMatrix(dom.matrixAContainer, dimA.rows, dimA.cols);
+            matrixB = readMatrix(dom.matrixBContainer, dimB.rows, dimB.cols);
+            clearError();
+            return true;
+        } catch (err) {
+            showError(err.message);
+            return false;
+        }
+    }
+
+    function rebuildMatrixDisplays() {
+        const sizeA = matrixA.size();
+        const sizeB = matrixB.size();
+        dom.rowsAInput.value = sizeA[0];
+        dom.colsAInput.value = sizeA[1];
+        dom.rowsBInput.value = sizeB[0];
+        dom.colsBInput.value = sizeB[1];
+        renderMatrixInput(sizeA[0], sizeA[1], dom.matrixAContainer, 'A', matrixA.toArray());
+        renderMatrixInput(sizeB[0], sizeB[1], dom.matrixBContainer, 'B', matrixB.toArray());
+    }
+
+    function buildMatrix(prefix) {
+        try {
+            const { rows, cols } = readDimensions(prefix);
+            const container = prefix === 'A' ? dom.matrixAContainer : dom.matrixBContainer;
+            renderMatrixInput(rows, cols, container, prefix);
+            updateMatrixFromInputs();
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    function setPreset(prefix, type) {
+        try {
+            const { rows, cols } = readDimensions(prefix);
+            if (type === 'identity' && rows !== cols) {
+                throw new Error('Identity requires a square matrix.');
+            }
+            const next = type === 'identity' ? math.identity(rows) : math.zeros(rows, cols);
+            if (prefix === 'A') matrixA = next;
+            else matrixB = next;
+            rebuildMatrixDisplays();
+            clearError();
+        } catch (err) {
+            showError(err.message);
+        }
+    }
+
+    function computeREF(matrix, returnSteps = false) {
+        const A = matrixToArray(matrix);
+        const rows = A.length;
+        const cols = A[0].length;
+        const steps = [];
+        let pivotRow = 0;
+
+        for (let col = 0; col < cols && pivotRow < rows; col++) {
+            let bestRow = pivotRow;
+            for (let row = pivotRow + 1; row < rows; row++) {
+                if (Math.abs(A[row][col]) > Math.abs(A[bestRow][col])) bestRow = row;
+            }
+            if (isNearZero(A[bestRow][col])) continue;
+
+            if (bestRow !== pivotRow) {
+                [A[pivotRow], A[bestRow]] = [A[bestRow], A[pivotRow]];
+                steps.push(`Swap R${pivotRow + 1} and R${bestRow + 1}.`);
+            }
+
+            const pivot = A[pivotRow][col];
+            if (!isNearZero(pivot - 1)) {
+                for (let k = col; k < cols; k++) A[pivotRow][k] /= pivot;
+                steps.push(`Scale R${pivotRow + 1} by 1/${formatNumber(pivot)}.`);
+            }
+
+            for (let row = pivotRow + 1; row < rows; row++) {
+                const factor = A[row][col];
+                if (isNearZero(factor)) continue;
+                for (let k = col; k < cols; k++) A[row][k] -= factor * A[pivotRow][k];
+                steps.push(`R${row + 1} <- R${row + 1} - ${formatNumber(factor)}R${pivotRow + 1}.`);
+            }
+            pivotRow++;
+        }
+
+        const result = math.matrix(cleanMatrixArray(A));
+        return returnSteps ? { result, steps } : result;
+    }
+
+    function computeRREF(matrix, returnSteps = false) {
+        const A = matrixToArray(matrix);
+        const rows = A.length;
+        const cols = A[0].length;
+        const steps = [];
+        let pivotRow = 0;
+
+        for (let col = 0; col < cols && pivotRow < rows; col++) {
+            let bestRow = pivotRow;
+            for (let row = pivotRow + 1; row < rows; row++) {
+                if (Math.abs(A[row][col]) > Math.abs(A[bestRow][col])) bestRow = row;
+            }
+            if (isNearZero(A[bestRow][col])) continue;
+
+            if (bestRow !== pivotRow) {
+                [A[pivotRow], A[bestRow]] = [A[bestRow], A[pivotRow]];
+                steps.push(`Swap R${pivotRow + 1} and R${bestRow + 1}.`);
+            }
+
+            const pivot = A[pivotRow][col];
+            if (!isNearZero(pivot - 1)) {
+                for (let k = 0; k < cols; k++) A[pivotRow][k] /= pivot;
+                steps.push(`Scale R${pivotRow + 1} by 1/${formatNumber(pivot)}.`);
+            }
+
+            for (let row = 0; row < rows; row++) {
+                if (row === pivotRow) continue;
+                const factor = A[row][col];
+                if (isNearZero(factor)) continue;
+                for (let k = 0; k < cols; k++) A[row][k] -= factor * A[pivotRow][k];
+                steps.push(`R${row + 1} <- R${row + 1} - ${formatNumber(factor)}R${pivotRow + 1}.`);
+            }
+            pivotRow++;
+        }
+
+        const result = math.matrix(cleanMatrixArray(A));
+        return returnSteps ? { result, steps } : result;
+    }
+
+    function computeRank(matrix) {
+        const ref = computeREF(matrix).toArray();
+        return ref.filter(row => row.some(value => !isNearZero(value))).length;
+    }
+
+    function getMinorMatrix(matrix, rowToRemove, colToRemove) {
+        return matrixToArray(matrix)
+            .filter((_, row) => row !== rowToRemove)
+            .map(row => row.filter((_, col) => col !== colToRemove));
+    }
+
+    function minorValue(matrix, row, col) {
+        const n = matrix.size()[0];
+        if (n === 1) return 1;
+        return math.det(math.matrix(getMinorMatrix(matrix, row, col)));
+    }
+
+    function adjointMatrix(matrix) {
+        const n = matrix.size()[0];
+        if (n === 1) return math.matrix([[1]]);
+
+        const cofactors = [];
+        for (let row = 0; row < n; row++) {
+            const cofactorRow = [];
+            for (let col = 0; col < n; col++) {
+                cofactorRow.push(((row + col) % 2 === 0 ? 1 : -1) * minorValue(matrix, row, col));
+            }
+            cofactors.push(cofactorRow);
+        }
+        return math.transpose(math.matrix(cofactors));
+    }
+
+    function matrixPower(matrix, exponent) {
+        if (!Number.isInteger(exponent)) throw new Error('Exponent must be an integer.');
+        const n = matrix.size()[0];
+        if (exponent === 0) return math.identity(n);
+
+        let base = matrix;
+        let power = exponent;
+        if (power < 0) {
+            if (isNearZero(math.det(matrix))) throw new Error('Negative powers require a non-singular matrix.');
+            base = math.inv(matrix);
+            power = Math.abs(power);
+        }
+
+        let result = math.identity(n);
+        while (power > 0) {
+            if (power % 2 === 1) result = math.multiply(result, base);
+            base = math.multiply(base, base);
+            power = Math.floor(power / 2);
+        }
+        return result;
+    }
+
+    function solveLinearGauss(A, bValues, returnSteps = false) {
+        const n = A.size()[0];
+        const augmented = matrixToArray(A).map((row, index) => [...row, bValues[index]]);
+        const steps = [];
+
+        for (let col = 0; col < n; col++) {
+            let bestRow = col;
+            for (let row = col + 1; row < n; row++) {
+                if (Math.abs(augmented[row][col]) > Math.abs(augmented[bestRow][col])) bestRow = row;
+            }
+            if (isNearZero(augmented[bestRow][col])) {
+                throw new Error('Matrix A is singular, so the system has no unique solution.');
+            }
+            if (bestRow !== col) {
+                [augmented[col], augmented[bestRow]] = [augmented[bestRow], augmented[col]];
+                steps.push(`Swap R${col + 1} and R${bestRow + 1}.`);
+            }
+            for (let row = col + 1; row < n; row++) {
+                const factor = augmented[row][col] / augmented[col][col];
+                if (isNearZero(factor)) continue;
+                for (let k = col; k <= n; k++) augmented[row][k] -= factor * augmented[col][k];
+                steps.push(`Eliminate x${col + 1} from R${row + 1}.`);
+            }
+        }
+
+        const solution = new Array(n).fill(0);
+        for (let row = n - 1; row >= 0; row--) {
+            let sum = 0;
+            for (let col = row + 1; col < n; col++) sum += augmented[row][col] * solution[col];
+            solution[row] = cleanNumber((augmented[row][n] - sum) / augmented[row][row]);
+        }
+
+        const result = math.matrix(solution);
+        return returnSteps ? { result, steps } : result;
+    }
+
+    function matricesApproximatelyEqual(left, right, tolerance = 1e-8) {
+        const leftSize = left.size();
+        const rightSize = right.size();
+        if (leftSize[0] !== rightSize[0] || leftSize[1] !== rightSize[1]) return false;
+
+        const A = matrixToArray(left);
+        const B = matrixToArray(right);
+        for (let row = 0; row < leftSize[0]; row++) {
+            for (let col = 0; col < leftSize[1]; col++) {
+                if (Math.abs(A[row][col] - B[row][col]) > tolerance) return false;
+            }
+        }
+        return true;
+    }
+
+    function characteristicPolynomial(matrix) {
+        const n = matrix.size()[0];
+        const identity = math.identity(n);
+        let B = identity;
+        const coefficients = [1];
+
+        for (let k = 1; k <= n; k++) {
+            const traceValue = math.trace(math.multiply(matrix, B));
+            const coefficient = cleanNumber(-traceValue / k);
+            coefficients.push(coefficient);
+            B = math.add(math.multiply(matrix, B), math.multiply(identity, coefficient));
+        }
+
+        return coefficients;
+    }
+
+    function formatPolynomial(coefficients) {
+        const degree = coefficients.length - 1;
+        const terms = [];
+
+        coefficients.forEach((coefficient, index) => {
+            const power = degree - index;
+            if (isNearZero(coefficient)) return;
+            const sign = coefficient < 0 ? '-' : '+';
+            const absCoefficient = Math.abs(coefficient);
+            const coeffText = isNearZero(absCoefficient - 1) && power > 0 ? '' : formatNumber(absCoefficient);
+            const variable = power === 0 ? '' : power === 1 ? 'lambda' : `lambda^${power}`;
+            terms.push({ sign, text: `${coeffText}${variable}` || '0' });
+        });
+
+        if (!terms.length) return '0';
+        return terms.map((term, index) => {
+            if (index === 0) return term.sign === '-' ? `-${term.text}` : term.text;
+            return ` ${term.sign} ${term.text}`;
+        }).join('');
+    }
+
+    function eigenValuesArray(matrix) {
+        if (typeof math.eigs !== 'function') {
+            throw new Error('Eigenvalue support is unavailable in the loaded Math.js build.');
+        }
+        return toVectorArray(math.eigs(matrix).values);
+    }
+
+    function isPositiveDefinite(matrix) {
+        if (!isSquareMatrix(matrix) || !matricesApproximatelyEqual(matrix, math.transpose(matrix))) return false;
+        const values = eigenValuesArray(matrix);
+        return values.every(value => typeof value === 'number' && value > EPS);
+    }
+
+    function isDiagonallyLikely(matrix) {
+        const values = eigenValuesArray(matrix);
+        const realValues = values.filter(value => typeof value === 'number');
+        if (realValues.length !== matrix.size()[0]) {
+            return { ok: false, message: 'Complex eigenvalue diagonalization is not displayed by this calculator.' };
+        }
+
+        const groups = [];
+        realValues.forEach(value => {
+            const group = groups.find(item => Math.abs(item.value - value) < 1e-7);
+            if (group) group.count++;
+            else groups.push({ value, count: 1 });
+        });
+
+        const n = matrix.size()[0];
+        const identity = math.identity(n);
+        const totalNullity = groups.reduce((sum, group) => {
+            const shifted = math.subtract(matrix, math.multiply(identity, group.value));
+            return sum + (n - computeRank(shifted));
+        }, 0);
+
+        return {
+            ok: totalNullity === n,
+            message: totalNullity === n
+                ? 'Yes, diagonalizable over the real numbers.'
+                : 'No, not diagonalizable over the real numbers.'
+        };
+    }
+
+    function parsePromptNumber(label, fallback) {
+        const input = prompt(label, fallback);
+        if (input === null) throw new Error('Operation cancelled.');
+        const value = Number(input.trim());
+        if (!Number.isFinite(value)) throw new Error('Please enter a finite number.');
+        return value;
+    }
+
+    function parsePromptInteger(label, fallback) {
+        const value = parsePromptNumber(label, fallback);
+        if (!Number.isInteger(value)) throw new Error('Please enter an integer.');
+        return value;
+    }
+
+    function parsePromptIndex(label, fallback, max) {
+        const value = parsePromptInteger(label, fallback);
+        if (value < 1 || value > max) throw new Error(`Index must be from 1 to ${max}.`);
+        return value - 1;
+    }
+
+    function parseBVector(length) {
+        const input = prompt(`Enter b vector (${length} numbers, separated by spaces or commas):`, Array.from({ length }, (_, i) => i + 1).join(' '));
+        if (input === null || input.trim() === '') throw new Error('A b vector is required.');
+        const values = input.split(/[\s,]+/).filter(Boolean).map(Number);
+        if (values.length !== length || values.some(value => !Number.isFinite(value))) {
+            throw new Error(`The b vector must contain exactly ${length} finite numbers.`);
+        }
+        return values;
+    }
+
+    function ensureSquare(matrix, name) {
+        if (!isSquareMatrix(matrix)) throw new Error(`${name} must be square.`);
+    }
+
+    function ensureSameDimensions(A, B) {
+        const sizeA = A.size();
+        const sizeB = B.size();
+        if (sizeA[0] !== sizeB[0] || sizeA[1] !== sizeB[1]) {
+            throw new Error(`Dimension mismatch: A is ${sizeA[0]}x${sizeA[1]}, B is ${sizeB[0]}x${sizeB[1]}.`);
+        }
+    }
+
+    function ensureMultiplicationDimensions(A, B) {
+        const sizeA = A.size();
+        const sizeB = B.size();
+        if (sizeA[1] !== sizeB[0]) {
+            throw new Error(`Multiplication requires columns of A (${sizeA[1]}) to equal rows of B (${sizeB[0]}).`);
+        }
+    }
+
+    function displayResult(value) {
+        if (value && value.L && value.U && value.P) {
+            dom.resultDisplay.textContent = '';
+            appendResultBlock(dom.resultDisplay, 'L (lower)', value.L);
+            appendResultBlock(dom.resultDisplay, 'U (upper)', value.U);
+            appendResultBlock(dom.resultDisplay, 'P (permutation)', value.P);
+            return;
+        }
+
+        if (math.isMatrix(value) || Array.isArray(value)) {
+            dom.resultDisplay.textContent = '';
+            appendResultBlock(dom.resultDisplay, '', value);
+            return;
+        }
+
+        setPre(dom.resultDisplay, prettyPrint(value));
+    }
+
+    function displaySteps(steps) {
+        if (!stepMode) {
+            setText(dom.stepsContent, 'Toggle step-by-step mode to see detailed explanation.');
+        } else if (steps.length) {
+            setPre(dom.stepsContent, steps.join('\n\n'));
         } else {
-            displayResult = prettyPrint(resultValue);
+            setText(dom.stepsContent, 'No detailed steps are available for this operation.');
         }
-        resultDisplay.innerHTML = `<pre style="white-space: pre-wrap; font-family: monospace;">${displayResult}</pre>`;
+    }
 
-        if (withSteps && stepsArray.length) {
-            stepsContent.innerHTML = `<pre style="white-space: pre-wrap;">${stepsArray.join('\n\n')}</pre>`;
-        } else if (withSteps) {
-            stepsContent.innerHTML = 'No detailed steps available for this operation.';
-        } else {
-            stepsContent.innerHTML = 'Toggle step-by-step mode to see detailed explanation.';
+    async function executeOperation(op) {
+        setLoading(true);
+        clearError();
+        setText(dom.resultDisplay, 'Computing...');
+        setText(dom.stepsContent, 'Preparing result...');
+
+        try {
+            if (!updateMatrixFromInputs()) throw new Error('Fix the highlighted input issue and try again.');
+
+            let resultValue;
+            let steps = [];
+
+            switch (op) {
+                case 'add':
+                    ensureSameDimensions(matrixA, matrixB);
+                    resultValue = math.add(matrixA, matrixB);
+                    steps.push('Add matching entries from A and B.');
+                    break;
+                case 'sub':
+                    ensureSameDimensions(matrixA, matrixB);
+                    resultValue = math.subtract(matrixA, matrixB);
+                    steps.push('Subtract each entry of B from the matching entry of A.');
+                    break;
+                case 'mul':
+                    ensureMultiplicationDimensions(matrixA, matrixB);
+                    resultValue = math.multiply(matrixA, matrixB);
+                    steps.push(`Multiply rows of A by columns of B to produce a ${matrixA.size()[0]}x${matrixB.size()[1]} matrix.`);
+                    break;
+                case 'scalar': {
+                    const scalar = parsePromptNumber('Enter scalar value:', '2');
+                    resultValue = math.multiply(matrixA, scalar);
+                    steps.push(`Multiply every entry of A by ${formatNumber(scalar)}.`);
+                    break;
+                }
+                case 'transpose':
+                    resultValue = math.transpose(matrixA);
+                    steps.push('Swap rows and columns of A.');
+                    break;
+                case 'det':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = cleanNumber(math.det(matrixA));
+                    steps.push(`det(A) = ${prettyPrint(resultValue)}.`);
+                    break;
+                case 'inv':
+                    ensureSquare(matrixA, 'Matrix A');
+                    if (isNearZero(math.det(matrixA))) throw new Error('Matrix A is singular and cannot be inverted.');
+                    resultValue = math.inv(matrixA);
+                    steps.push('Use Gauss-Jordan elimination to form A inverse.');
+                    break;
+                case 'trace':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = cleanNumber(math.trace(matrixA));
+                    steps.push('Add the entries on the main diagonal.');
+                    break;
+                case 'rank':
+                    resultValue = computeRank(matrixA);
+                    steps.push('Reduce A to row echelon form and count non-zero rows.');
+                    break;
+                case 'minor': {
+                    ensureSquare(matrixA, 'Matrix A');
+                    const n = matrixA.size()[0];
+                    const row = parsePromptIndex('Row index (1-based):', '1', n);
+                    const col = parsePromptIndex('Column index (1-based):', '1', n);
+                    resultValue = cleanNumber(minorValue(matrixA, row, col));
+                    steps.push(`Remove row ${row + 1} and column ${col + 1}, then compute the determinant.`);
+                    break;
+                }
+                case 'cofactor': {
+                    ensureSquare(matrixA, 'Matrix A');
+                    const n = matrixA.size()[0];
+                    const row = parsePromptIndex('Row index (1-based):', '1', n);
+                    const col = parsePromptIndex('Column index (1-based):', '1', n);
+                    const minor = minorValue(matrixA, row, col);
+                    resultValue = cleanNumber(((row + col) % 2 === 0 ? 1 : -1) * minor);
+                    steps.push(`Cofactor = (-1)^(${row + 1}+${col + 1}) times the minor.`);
+                    break;
+                }
+                case 'adjoint':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = adjointMatrix(matrixA);
+                    steps.push('Build the cofactor matrix and transpose it.');
+                    break;
+                case 'ref': {
+                    const output = computeREF(matrixA, true);
+                    resultValue = output.result;
+                    steps = output.steps;
+                    break;
+                }
+                case 'rref': {
+                    const output = computeRREF(matrixA, true);
+                    resultValue = output.result;
+                    steps = output.steps;
+                    break;
+                }
+                case 'gauss_solve': {
+                    ensureSquare(matrixA, 'Matrix A');
+                    const bValues = parseBVector(matrixA.size()[0]);
+                    const output = solveLinearGauss(matrixA, bValues, true);
+                    resultValue = output.result;
+                    steps = output.steps;
+                    break;
+                }
+                case 'power': {
+                    ensureSquare(matrixA, 'Matrix A');
+                    const exponent = parsePromptInteger('Exponent n (integer):', '2');
+                    resultValue = matrixPower(matrixA, exponent);
+                    steps.push(`Compute A^${exponent} using repeated squaring.`);
+                    break;
+                }
+                case 'matrixDiv':
+                    ensureSquare(matrixB, 'Matrix B');
+                    ensureMultiplicationDimensions(matrixA, matrixB);
+                    if (isNearZero(math.det(matrixB))) throw new Error('Matrix B is singular, so A / B is undefined.');
+                    resultValue = math.multiply(matrixA, math.inv(matrixB));
+                    steps.push('A / B is interpreted as A multiplied by inverse(B).');
+                    break;
+                case 'lu':
+                    ensureSquare(matrixA, 'Matrix A');
+                    {
+                        const lu = math.lup(matrixA);
+                        resultValue = { L: lu.L, U: lu.U, P: lu.P || lu.p };
+                    }
+                    steps.push('Compute LUP decomposition with partial pivoting.');
+                    break;
+                case 'eigen':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = eigenValuesArray(matrixA);
+                    steps.push('Solve det(lambda I - A) = 0.');
+                    break;
+                case 'eigenvectors':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = math.eigs(matrixA).vectors || math.eigs(matrixA).eigenvectors;
+                    if (!resultValue) throw new Error('Eigenvectors are unavailable in this Math.js build.');
+                    steps.push('Each vector solves (A - lambda I)x = 0.');
+                    break;
+                case 'diag': {
+                    ensureSquare(matrixA, 'Matrix A');
+                    const check = isDiagonallyLikely(matrixA);
+                    resultValue = check.message;
+                    steps.push('Compare total eigenspace dimension with the matrix size.');
+                    break;
+                }
+                case 'charpoly': {
+                    ensureSquare(matrixA, 'Matrix A');
+                    const coefficients = characteristicPolynomial(matrixA);
+                    resultValue = `p(lambda) = ${formatPolynomial(coefficients)}`;
+                    steps.push('Use the Faddeev-LeVerrier method to compute characteristic coefficients.');
+                    break;
+                }
+                case 'isSymmetric':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = matricesApproximatelyEqual(matrixA, math.transpose(matrixA)) ? 'Yes, symmetric.' : 'No, not symmetric.';
+                    break;
+                case 'isSkew':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = matricesApproximatelyEqual(matrixA, math.multiply(math.transpose(matrixA), -1)) ? 'Yes, skew-symmetric.' : 'No, not skew-symmetric.';
+                    break;
+                case 'isOrthogonal':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = matricesApproximatelyEqual(math.multiply(math.transpose(matrixA), matrixA), math.identity(matrixA.size()[0])) ? 'Yes, orthogonal.' : 'No, not orthogonal.';
+                    break;
+                case 'isSingular':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = isNearZero(math.det(matrixA)) ? 'Yes, singular.' : 'No, non-singular.';
+                    break;
+                case 'isPosDef':
+                    ensureSquare(matrixA, 'Matrix A');
+                    resultValue = isPositiveDefinite(matrixA) ? 'Yes, positive definite.' : 'No, not positive definite.';
+                    break;
+                default:
+                    throw new Error('Unknown operation.');
+            }
+
+            displayResult(resultValue);
+            displaySteps(steps);
+        } catch (err) {
+            console.error(err);
+            showError(err.message || 'Computation error.');
+            setPre(dom.resultDisplay, `Error: ${err.message || 'Computation error.'}`, 'error-text');
+            setText(dom.stepsContent, 'Operation failed. Check matrix dimensions and values.');
+        } finally {
+            setLoading(false);
         }
-    } catch (err) {
-        console.error(err);
-        showError(err.message || 'Computation error');
-        resultDisplay.innerHTML = `<span style="color: var(--danger);">❌ Error: ${err.message}</span>`;
-        stepsContent.innerHTML = 'Operation failed. Check matrix dimensions and values.';
-    } finally {
-        setLoading(false);
     }
-}
 
-// ------------------------- EVENT BINDINGS FOR OPERATIONS -------------------------
-const opButtons = document.querySelectorAll('.op-btn');
-opButtons.forEach(btn => {
-    btn.addEventListener('click', () => {
-        const op = btn.dataset.op;
-        if (op) executeOperation(op);
-    });
-});
-
-// Theme toggle with persistence
-function setTheme(theme) {
-    if (theme === 'dark') {
-        document.body.classList.add('dark');
-        themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
-    } else {
-        document.body.classList.remove('dark');
-        themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+    function setTheme(theme) {
+        const isDark = theme === 'dark';
+        document.body.classList.toggle('dark', isDark);
+        dom.themeToggleBtn.innerHTML = `<i class="fas ${isDark ? 'fa-sun' : 'fa-moon'}" aria-hidden="true"></i>`;
+        dom.themeToggleBtn.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+        currentTheme = isDark ? 'dark' : 'light';
+        localStorage.setItem('matrixforge-theme', currentTheme);
     }
-    currentTheme = theme;
-    localStorage.setItem('matrixforge-theme', theme);
-}
 
-themeToggleBtn.addEventListener('click', () => {
-    const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-    setTheme(newTheme);
-});
+    function bindEvents() {
+        document.getElementById('buildMatrixA').addEventListener('click', () => buildMatrix('A'));
+        document.getElementById('buildMatrixB').addEventListener('click', () => buildMatrix('B'));
+        document.getElementById('setIdentityA').addEventListener('click', () => setPreset('A', 'identity'));
+        document.getElementById('setZeroA').addEventListener('click', () => setPreset('A', 'zero'));
+        document.getElementById('setIdentityB').addEventListener('click', () => setPreset('B', 'identity'));
+        document.getElementById('setZeroB').addEventListener('click', () => setPreset('B', 'zero'));
 
-// Step mode toggle
-stepToggleCheckbox.addEventListener('change', (e) => {
-    stepMode = e.target.checked;
-    stepsContent.innerHTML = stepMode ? '✅ Step-by-step mode active. Perform any operation.' : 'Step mode disabled. Toggle to see detailed solutions.';
-});
+        document.querySelectorAll('.op-btn').forEach(button => {
+            button.addEventListener('click', () => executeOperation(button.dataset.op));
+        });
 
-// Initialize on page load
-window.addEventListener('DOMContentLoaded', () => {
-    const savedTheme = localStorage.getItem('matrixforge-theme');
-    if (savedTheme === 'dark') setTheme('dark');
-    else setTheme('light');
+        dom.themeToggleBtn.addEventListener('click', () => {
+            setTheme(currentTheme === 'light' ? 'dark' : 'light');
+        });
 
-    renderMatrixInput(3, 3, 'matrixAContainer', [[1,2,3],[4,5,6],[7,8,9]]);
-    renderMatrixInput(3, 3, 'matrixBContainer', [[9,8,7],[6,5,4],[3,2,1]]);
-    updateMatrixFromInputs();
-    stepMode = false;
-    stepToggleCheckbox.checked = false;
-    stepsContent.innerHTML = 'Toggle step-by-step mode to see detailed solutions.';
-});
+        dom.stepToggleCheckbox.addEventListener('change', event => {
+            stepMode = event.target.checked;
+            setText(dom.stepsContent, stepMode
+                ? 'Step-by-step mode active. Perform any operation.'
+                : 'Step mode disabled. Toggle to see detailed solutions.');
+        });
+    }
+
+    function init() {
+        cacheDom();
+        if (!isMathReady()) {
+            showError('Math.js failed to load. Check your network connection and refresh.');
+            setPre(dom.resultDisplay, 'Math.js failed to load.');
+            return;
+        }
+
+        matrixA = math.matrix([[1, 2, 3], [4, 5, 6], [7, 8, 9]]);
+        matrixB = math.matrix([[9, 8, 7], [6, 5, 4], [3, 2, 1]]);
+        renderMatrixInput(3, 3, dom.matrixAContainer, 'A', matrixA.toArray());
+        renderMatrixInput(3, 3, dom.matrixBContainer, 'B', matrixB.toArray());
+        bindEvents();
+        setTheme(localStorage.getItem('matrixforge-theme') === 'dark' ? 'dark' : 'light');
+        updateMatrixFromInputs();
+        dom.stepToggleCheckbox.checked = false;
+        setText(dom.stepsContent, 'Toggle step-by-step mode to see detailed solutions.');
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+})();
