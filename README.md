@@ -1,149 +1,271 @@
-# Nikhil Matrix Studio
+# 🔢 Nikhil Matrix Studio
 
-Advanced Matrix Calculator and Linear Algebra Toolkit built using HTML, CSS, and JavaScript.
+### Advanced Matrix Calculator & Linear Algebra Toolkit
 
-A modern, responsive, and student-friendly web application designed to solve matrix problems ranging from basic operations to advanced linear algebra calculations.
+<div align="center">
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Advanced-Matrix%20Calculator-6C63FF?style=for-the-badge">
-  <img src="https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge&logo=html5&logoColor=white">
-  <img src="https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge&logo=css3&logoColor=white">
-  <img src="https://img.shields.io/badge/JavaScript-ES6-F7DF1E?style=for-the-badge&logo=javascript&logoColor=black">
-  <img src="https://img.shields.io/badge/Netlify-Live-00C7B7?style=for-the-badge&logo=netlify&logoColor=white">
-  <img src="https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge">
-</p>
+[![Live Demo](https://img.shields.io/badge/Live-Demo-success?style=for-the-badge)](https://nikhilmatrixstudio.netlify.app/)
 
-## Live Preview
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge\&logo=html5\&logoColor=white)
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge\&logo=css3\&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6-F7DF1E?style=for-the-badge\&logo=javascript\&logoColor=black)
+![Netlify](https://img.shields.io/badge/Netlify-Live-00C7B7?style=for-the-badge\&logo=netlify\&logoColor=white)
+![Linear Algebra](https://img.shields.io/badge/Linear-Algebra-blueviolet?style=for-the-badge)
+![Status](https://img.shields.io/badge/Status-Production%20Ready-success?style=for-the-badge)
 
+</div>
+
+---
+
+## 🚀 Overview
+
+Nikhil Matrix Studio is a modern web-based matrix calculator and linear algebra toolkit designed for students, educators, and mathematics enthusiasts.
+
+The platform supports matrix operations ranging from basic arithmetic to advanced linear algebra concepts such as eigenvalues, eigenvectors, LU decomposition, Gaussian elimination, and matrix analysis.
+
+Built using pure JavaScript without external mathematical libraries, the application demonstrates algorithm implementation, mathematical computation, and responsive frontend engineering.
+
+🔗 Live Demo:
 https://nikhilmatrixstudio.netlify.app/
----
-
-## Features
-
-### Basic Matrix Operations
-- Matrix Addition
-- Matrix Subtraction
-- Matrix Multiplication
-- Scalar Multiplication
-- Matrix Transpose
-
-### Intermediate Operations
-- Determinant
-- Inverse Matrix
-- Trace
-- Rank
-- Minor
-- Cofactor
-- Adjoint Matrix
-
-### Advanced Operations
-- REF (Row Echelon Form)
-- RREF (Reduced Row Echelon Form)
-- Gaussian Elimination
-- Gauss-Jordan Method
-- Solve Linear Equations
-- Matrix Power
-- Matrix Division
-- LU Decomposition
-
-### Linear Algebra Tools
-- Eigenvalues
-- Eigenvectors
-- Characteristic Polynomial
-- Diagonalization Check
-- Matrix Type Detection
-
-### Matrix Analysis
-- Symmetric Matrix Check
-- Skew-Symmetric Check
-- Orthogonal Matrix Check
-- Singular Matrix Detection
-- Positive Definite Check
-
-### User Experience
-- Modern Responsive UI
-- Student-Friendly Design
-- Dark / Light Theme
-- Step-by-Step Mode
-- Error Handling
-- Mobile Friendly Layout
-- Accessible Controls
 
 ---
 
-## Tech Stack
+## ✨ Key Features
 
-- HTML5
-- CSS3
-- JavaScript (Vanilla)
-- Mathematical Algorithms
+### 🔢 Basic Matrix Operations
+
+✅ Matrix Addition
+
+✅ Matrix Subtraction
+
+✅ Matrix Multiplication
+
+✅ Scalar Multiplication
+
+✅ Matrix Transpose
 
 ---
 
-## Folder Structure
+### 📐 Intermediate Operations
+
+✅ Determinant Calculation
+
+✅ Matrix Inverse
+
+✅ Matrix Trace
+
+✅ Matrix Rank
+
+✅ Matrix Minor
+
+✅ Matrix Cofactor
+
+✅ Adjoint Matrix
+
+---
+
+### 🧮 Advanced Linear Algebra
+
+✅ REF (Row Echelon Form)
+
+✅ RREF (Reduced Row Echelon Form)
+
+✅ Gaussian Elimination
+
+✅ Gauss-Jordan Method
+
+✅ Matrix Power
+
+✅ Matrix Division
+
+✅ LU Decomposition
+
+✅ Linear Equation Solver
+
+---
+
+### 🎓 Matrix Analysis Tools
+
+✅ Eigenvalue Calculation
+
+✅ Eigenvector Computation
+
+✅ Characteristic Polynomial
+
+✅ Diagonalization Check
+
+✅ Matrix Type Detection
+
+---
+
+### 🔍 Matrix Property Analysis
+
+✅ Symmetric Matrix Detection
+
+✅ Skew-Symmetric Detection
+
+✅ Orthogonal Matrix Check
+
+✅ Singular Matrix Detection
+
+✅ Positive Definite Check
+
+---
+
+### 🎨 User Experience
+
+✅ Modern Responsive UI
+
+✅ Mobile-Friendly Layout
+
+✅ Dark / Light Theme
+
+✅ Error Handling
+
+✅ Student-Friendly Design
+
+✅ Accessible Controls
+
+---
+# 🛠 Technology Stack
+
+### Frontend
+
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=for-the-badge\&logo=html5\&logoColor=white)
+
+![CSS3](https://img.shields.io/badge/CSS3-1572B6?style=for-the-badge\&logo=css3\&logoColor=white)
+
+![JavaScript](https://img.shields.io/badge/JavaScript-ES6-F7DF1E?style=for-the-badge\&logo=javascript\&logoColor=black)
+
+### Core Concepts
+
+* Matrix Mathematics
+* Linear Algebra
+* Algorithm Design
+* Mathematical Computation
+* Responsive UI Design
+* DOM Manipulation
+
+---
+
+# 📂 Project Structure
 
 ```text
-matrix-calculator-pro/
+matrix-studio/
 │
 ├── index.html
 ├── style.css
 ├── script.js
-├── README.md
-└── assets/
+├── assets/
+│   ├── light.png
+│   ├── dark.png
+│   └── banner.png
+│
+└── README.md
 ```
 
 ---
 
-## Screenshots
+# 📸 Screenshots
 
-### Home Light\Dark Theme Preview
+<table>
+<tr>
+<td align="center">
+<b>Light Theme</b><br><br>
+<img src="assets/light.png" width="450"/>
+</td>
+
+<td align="center">
+<b>Dark Theme</b><br><br>
+<img src="assets/dark.png" width="450"/>
+</td>
+</tr>
+</table>
+
+---
+
+# 🎯 Learning Objectives
+
+This project was built to explore and strengthen knowledge in:
+
+* Matrix Mathematics
+* Linear Algebra Algorithms
+* JavaScript Programming
+* Mathematical Problem Solving
+* Frontend Development
+* User Interface Design
+
+---
+
+# 🚀 Future Enhancements
+
+* Step-by-Step Solution Visualization
+* Matrix Graph Visualization
+* Matrix Export Functionality
+* PDF Report Generation
+* Complex Number Support
+* Numerical Methods Toolkit
+* Equation Solver Expansion
+
+---
+
+# 👨‍💻 Author
+
+<div align="center">
+
+<h2>Nikhil Singh</h2>
+
 <p>
-  <img src="assets/light.png" width="550" alt="Light Mode">
-  </p>
-<p>
-  <img src="assets/dark.png" width="550" alt="Dark Mode">
+Software Development Intern • Full-Stack Developer • Founder @ Gorakhpur Web Studio
 </p>
 
+<br>
+
+<!-- Social Icons -->
+
+<a href="mailto:nikhil.mca.in@gmail.com">
+  <img src="https://skillicons.dev/icons?i=gmail" height="55"/>
+</a>
+
+<a href="https://www.linkedin.com/in/nikhil-mca-in/">
+  <img src="https://skillicons.dev/icons?i=linkedin" height="55"/>
+</a>
+
+<a href="https://github.com/nikhil-mca-code">
+  <img src="https://skillicons.dev/icons?i=github" height="55"/>
+</a>
+
+<br><br>
+
+<!-- Projects -->
+
+<a href="https://class-orbit.netlify.app/">
+  <img src="https://img.shields.io/badge/Class_Orbit-Live_Demo-6C63FF?style=for-the-badge&logo=google-chrome&logoColor=white"/>
+</a>
+
+<a href="https://examcenterhelp.netlify.app/">
+  <img src="https://img.shields.io/badge/Exam_Center_Help-Live_Demo-009688?style=for-the-badge&logo=googleforms&logoColor=white"/>
+</a>
+
+<a href="https://nikhilmatrixstudio.netlify.app/">
+  <img src="https://img.shields.io/badge/Matrix_Studio-Live_Demo-FF9800?style=for-the-badge&logo=googlechrome&logoColor=white"/>
+</a>
+
+<br><br>
+
+<!-- Website & Instagram -->
+
+<a href="https://gorakhpurwebstudio.in/">
+  <img src="https://img.shields.io/badge/Gorakhpur_Web_Studio-Website-00C853?style=for-the-badge&logo=google-chrome&logoColor=white"/>
+</a>
+
+</div>
 
 ---
 
-## How to Run
+⭐ If you found this project useful, consider giving it a star.
 
-1. Clone repository
+🚀 Contributions, suggestions, and feedback are welcome.
 
-```bash
-git clone https://github.com/nikhil-mca-code/web-dev-projects.git
-```
+💡 Built with passion for learning, problem-solving, and creating impactful software.
 
-2. Open project folder
-
-3. Run `index.html` in browser
-
-No installation required.
-
----
-
-## Learning Purpose
-
-This project was built to explore:
-
-- Matrix mathematics
-- Linear algebra algorithms
-- DOM manipulation
-- JavaScript logic
-- UI/UX design
-- Frontend development
-
----
-
-## Author
-
-**Nikhil Singh**
-
-Designed and developed as a frontend mathematical web application project.
-
----
-
-## License
-
-MIT License
